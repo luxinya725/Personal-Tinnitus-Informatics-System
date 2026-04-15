@@ -1,0 +1,40 @@
+@import "tailwindcss";
+
+@theme {
+  --color-sage-dark: #556B2F;
+  --color-sage-medium: #8A9A5B;
+  --color-sage-light: #C1CDC1;
+  --color-sage-pale: #E1E8E1;
+  --color-cream: #FCFAF7;
+  --color-ink: #2C3322;
+  --color-accent: #D4A373;
+  --color-insight-bg: #FFF8E1;
+  --color-insight-border: #FFC107;
+  --color-insight-text: #856404;
+  
+  --font-sans: 'Helvetica Neue', Arial, sans-serif;
+  --font-serif: 'Georgia', serif;
+}
+
+@layer base {
+  body {
+    @apply bg-[#F0F2ED] text-ink antialiased;
+  }
+  
+  h1, h2, h3 {
+    @apply font-serif;
+  }
+}
+
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Custom slider styling */
+input[type='range'] {
+  @apply accent-sage-medium;
+}
+
+.card-shadow {
+  box-shadow: 0 4px 12px rgba(85, 107, 47, 0.05);
+}

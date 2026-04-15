@@ -1,0 +1,6 @@
+{
+  "name": "Remix: Tinnitus Tracker",
+  "description": "A personal informatics system for tinnitus symptom tracking and medication logging.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}
