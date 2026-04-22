@@ -18,11 +18,11 @@ export default function HomePage({ user, tinnitusLogs, medicationLogs, onNavigat
   const lastLog = tinnitusLogs[0];
 
   return (
-    <div className="px-6 pt-12 pb-6 space-y-8">
+    <div className="px-6 pt-12 pb-6 space-y-10">
       <header className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-sage-900">Hi, {user?.name || 'Alex'}</h1>
-          <p className="text-sage-500 text-sm">{format(new Date(), 'EEEE, MMMM do')}</p>
+          <h1 className="text-2xl font-black text-sage-900 tracking-tight">Hi, {user?.name || 'Alex'}</h1>
+          <p className="text-sage-500 text-sm font-medium">{format(new Date(), 'EEEE, MMMM do')}</p>
         </div>
         <div className="w-12 h-12 bg-sage-pale rounded-full overflow-hidden border-2 border-white shadow-sm">
           <img 
@@ -48,21 +48,21 @@ export default function HomePage({ user, tinnitusLogs, medicationLogs, onNavigat
         />
       </section>
 
-      <section className="bg-white rounded-[18px] p-6 card-shadow border border-sage-pale space-y-4">
+      <section className="bg-white rounded-[32px] p-7 card-shadow border border-sage-pale/50 space-y-6">
         <div className="flex justify-between items-center">
-          <h2 className="font-bold text-sage-dark">Today's Snapshot</h2>
-          <button onClick={() => onNavigate('history')} className="text-sage-medium text-xs font-medium flex items-center">
+          <h2 className="font-bold text-sage-dark tracking-tight">Today's Snapshot</h2>
+          <button onClick={() => onNavigate('history')} className="text-sage-medium text-xs font-bold flex items-center gap-1">
             Details <ChevronRight size={14} />
           </button>
         </div>
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-1">
-            <p className="text-2xl font-bold text-ink">{todayTinnitus.length}</p>
-            <p className="text-[10px] text-sage-medium uppercase tracking-widest font-bold opacity-60">Logs</p>
+            <p className="text-3xl font-black text-ink">{todayTinnitus.length}</p>
+            <p className="text-[10px] text-sage-medium tracking-wider font-extrabold opacity-60">LOGS</p>
           </div>
           <div className="space-y-1">
-            <p className="text-2xl font-bold text-sage-medium">{todayMedication.length}</p>
-            <p className="text-[10px] text-sage-medium uppercase tracking-widest font-bold opacity-60">Medication</p>
+            <p className="text-3xl font-black text-sage-medium">{todayMedication.length}</p>
+            <p className="text-[10px] text-sage-medium tracking-wider font-extrabold opacity-60">MEDS</p>
           </div>
         </div>
         {lastLog && (
@@ -73,9 +73,9 @@ export default function HomePage({ user, tinnitusLogs, medicationLogs, onNavigat
         )}
       </section>
 
-      <section className="bg-white rounded-[18px] p-6 card-shadow border border-sage-pale relative overflow-hidden">
-        <h2 className="font-bold text-ink mb-2">Daily Insight</h2>
-        <p className="text-ink/80 text-sm leading-relaxed">
+      <section className="bg-white rounded-[32px] p-7 card-shadow border border-sage-pale/50 relative overflow-hidden ring-1 ring-sage-pale/20">
+        <h2 className="font-bold text-ink mb-2 tracking-tight">Daily Insight</h2>
+        <p className="text-ink/80 text-sm leading-relaxed font-semibold">
           You often log symptoms in the evening when your surroundings are quieter.
         </p>
       </section>
@@ -121,14 +121,14 @@ function ActionButton({ onClick, icon, label, color }: { onClick: () => void, ic
     <button 
       onClick={onClick}
       className={cn(
-        "flex flex-col items-center justify-center gap-3 p-6 rounded-[18px] transition-transform active:scale-95 border border-sage-pale",
+        "flex flex-col items-center justify-center gap-3 p-6 rounded-[32px] transition-transform active:scale-95 border border-sage-pale/40",
         color
       )}
     >
-      <div className="bg-white p-3 rounded-xl shadow-sm">
+      <div className="bg-white p-3 rounded-2xl shadow-sm">
         {icon}
       </div>
-      <span className="text-xs font-bold text-sage-dark uppercase tracking-wider">{label}</span>
+      <span className="text-[11px] font-bold text-sage-dark tracking-tight">{label}</span>
     </button>
   );
 }

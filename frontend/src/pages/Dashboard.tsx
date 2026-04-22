@@ -83,18 +83,29 @@ export default function DashboardPage({ tinnitusLogs, medicationLogs }: Dashboar
   const correlationData = useMemo(() => {
     const factors = [
       { name: 'Stress', value: 0, count: 0 },
-      { name: 'Caffeine', value: 0, count: 0 },
-      { name: 'Alcohol', value: 0, count: 0 },
-      { name: 'Noise', value: 0, count: 0 },
       { name: 'Poor Sleep', value: 0, count: 0 },
+      { name: 'Doomscroll', value: 0, count: 0 },
+      { name: 'Headache', value: 0, count: 0 },
+      { name: 'Outside', value: 0, count: 0 },
     ];
 
     filteredTinnitus.forEach(log => {
-      if (log.stressLevel === 'High') { factors[0].value += log.severity; factors[0].count++; }
-      if (log.caffeine) { factors[1].value += log.severity; factors[1].count++; }
-      if (log.alcohol) { factors[2].value += log.severity; factors[2].count++; }
-      if (log.noiseExposure) { factors[3].value += log.severity; factors[3].count++; }
-      if (log.sleepQuality === 'Poor') { factors[4].value += log.severity; factors[4].count++; }
+      // Stress (New or Legacy)
+      const stressVal = (log.lifestyle?.stress ?? (log.stressLevel === 'High' ? 3 : 1));
+      if (stressVal >= 2) { factors[0].value += log.severity; factors[0].count++; }
+      
+      // Sleep (New or Legacy)
+      const sleepVal = (log.sleepQualityValue != null ? (6 - log.sleepQualityValue) : (log.sleepQuality === 'Poor' ? 3 : 1));
+      if (sleepVal >= 3) { factors[1].value += log.severity; factors[1].count++; }
+
+      // Doomscrolling
+      if (log.lifestyle?.doomscrolling && log.lifestyle.doomscrolling >= 2) { factors[2].value += log.severity; factors[2].count++; }
+
+      // Headache
+      if (log.symptoms?.headache && log.symptoms.headache >= 2) { factors[3].value += log.severity; factors[3].count++; }
+
+      // Time Outside (Positive factor - checking if low outside time correlates)
+      if (log.lifestyle?.timeOutside != null && log.lifestyle.timeOutside <= 1) { factors[4].value += log.severity; factors[4].count++; }
     });
 
     return factors.map(f => ({
@@ -107,15 +118,15 @@ export default function DashboardPage({ tinnitusLogs, medicationLogs }: Dashboar
   return (
     <div className="px-6 pt-16 pb-12 space-y-8">
       <header className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold text-sage-dark">Patterns</h1>
-        <div className="flex bg-sage-pale p-1 rounded-xl">
+        <h1 className="text-2xl font-black text-sage-dark tracking-tight">Patterns</h1>
+        <div className="flex bg-sage-pale/50 p-1.5 rounded-2xl border border-sage-pale/30">
           {[7, 30, 90].map((range) => (
             <button
               key={range}
               onClick={() => setTimeRange(range as any)}
               className={cn(
-                "px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all",
-                timeRange === range ? "bg-sage-medium text-white shadow-sm" : "text-sage-dark opacity-50"
+                "px-3 py-1.5 text-[10px] font-extrabold rounded-xl transition-all",
+                timeRange === range ? "bg-sage-medium text-white shadow-md shadow-sage-medium/20 scale-105" : "text-sage-dark opacity-40 hover:opacity-100"
               )}
             >
               {range}d
@@ -125,14 +136,14 @@ export default function DashboardPage({ tinnitusLogs, medicationLogs }: Dashboar
       </header>
 
       {/* Severity Over Time */}
-      <section className="bg-white p-6 rounded-[18px] border border-sage-pale card-shadow space-y-6">
+      <section className="bg-white p-7 rounded-[32px] border border-sage-pale/50 card-shadow space-y-6">
         <div className="flex justify-between items-start">
           <div>
-            <h2 className="font-bold text-sage-dark">Severity Over Time</h2>
-            <p className="text-xs text-sage-medium font-medium opacity-70">Daily average symptom level</p>
+            <h2 className="font-bold text-sage-dark tracking-tight">Severity Over Time</h2>
+            <p className="text-xs text-sage-medium font-bold opacity-50 tracking-tight">Average daily symptom level</p>
           </div>
-          <div className="bg-sage-pale p-2 rounded-xl">
-            <TrendingUp size={18} className="text-sage-medium" />
+          <div className="bg-sage-pale/50 p-2.5 rounded-2xl">
+            <TrendingUp size={20} className="text-sage-medium" />
           </div>
         </div>
         
@@ -174,14 +185,14 @@ export default function DashboardPage({ tinnitusLogs, medicationLogs }: Dashboar
       </section>
 
       {/* Time of Day Pattern */}
-      <section className="bg-white p-6 rounded-[18px] border border-sage-pale card-shadow space-y-6">
+      <section className="bg-white p-7 rounded-[32px] border border-sage-pale/50 card-shadow space-y-6">
         <div className="flex justify-between items-start">
           <div>
-            <h2 className="font-bold text-sage-dark">Time of Day Pattern</h2>
-            <p className="text-xs text-sage-medium font-medium opacity-70">When symptoms occur most</p>
+            <h2 className="font-bold text-sage-dark tracking-tight">Time of Day</h2>
+            <p className="text-xs text-sage-medium font-bold opacity-50 tracking-tight">When symptoms typically surface</p>
           </div>
-          <div className="bg-sage-pale p-2 rounded-xl">
-            <Zap size={18} className="text-sage-medium" />
+          <div className="bg-sage-pale/50 p-2.5 rounded-2xl">
+            <Zap size={20} className="text-sage-medium" />
           </div>
         </div>
 
@@ -212,14 +223,14 @@ export default function DashboardPage({ tinnitusLogs, medicationLogs }: Dashboar
       </section>
 
       {/* Context Correlation */}
-      <section className="bg-white p-6 rounded-[18px] border border-sage-pale card-shadow space-y-6">
+      <section className="bg-white p-7 rounded-[32px] border border-sage-pale/50 card-shadow space-y-6">
         <div className="flex justify-between items-start">
           <div>
-            <h2 className="font-bold text-sage-dark">Trigger Correlation</h2>
-            <p className="text-xs text-sage-medium font-medium opacity-70">Avg severity per factor</p>
+            <h2 className="font-bold text-sage-dark tracking-tight">Trigger Analysis</h2>
+            <p className="text-xs text-sage-medium font-bold opacity-50 tracking-tight">Average severity per context</p>
           </div>
-          <div className="bg-sage-pale p-2 rounded-xl">
-            <AlertCircle size={18} className="text-sage-medium" />
+          <div className="bg-sage-pale/50 p-2.5 rounded-2xl">
+            <AlertCircle size={20} className="text-sage-medium" />
           </div>
         </div>
 

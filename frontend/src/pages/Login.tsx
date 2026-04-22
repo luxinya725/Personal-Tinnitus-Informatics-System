@@ -9,45 +9,45 @@ export default function LoginPage({ onLogin }: { onLogin: () => void }) {
   return (
     <div className="min-h-screen bg-cream flex flex-col px-8 pt-20 pb-10">
       <div className="mb-12 text-center">
-        <div className="w-20 h-20 bg-sage-medium rounded-[24px] mx-auto flex items-center justify-center shadow-lg shadow-sage-medium/20 rotate-3 mb-6">
+        <div className="w-20 h-20 bg-sage-medium rounded-[32px] mx-auto flex items-center justify-center shadow-lg shadow-sage-medium/20 rotate-3 mb-6">
           <Activity className="text-white" size={40} />
         </div>
-        <h1 className="text-3xl font-bold text-sage-dark mb-2 tracking-tight">QuietSpace</h1>
-        <p className="text-sage-medium font-medium opacity-70">Your journey to silence starts here.</p>
+        <h1 className="text-3xl font-black text-sage-dark mb-2 tracking-tight">QuietSpace</h1>
+        <p className="text-sage-medium font-bold opacity-60">Your journey to silence starts here.</p>
       </div>
 
       <div className="space-y-6 flex-1">
-        <div className="space-y-2">
-          <label className="text-[10px] font-bold text-sage-medium uppercase tracking-widest ml-1">Email</label>
+        <div className="space-y-3">
+          <label className="text-[11px] font-bold text-sage-medium opacity-70 ml-1">Email</label>
           <div className="relative">
-            <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-sage-medium opacity-50" size={20} />
+            <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-sage-medium opacity-40" size={20} />
             <input 
               type="email" 
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="alex@example.com"
-              className="w-full bg-white border border-sage-pale rounded-xl py-4 pl-12 pr-4 text-sm focus:ring-2 focus:ring-sage-medium outline-none transition-all"
+              className="w-full bg-white border border-sage-pale/60 rounded-2xl py-4 pl-12 pr-4 text-sm font-bold focus:ring-4 focus:ring-sage-medium/10 outline-none transition-all"
             />
           </div>
         </div>
 
-        <div className="space-y-2">
-          <label className="text-[10px] font-bold text-sage-medium uppercase tracking-widest ml-1">Password</label>
+        <div className="space-y-3">
+          <label className="text-[11px] font-bold text-sage-medium opacity-70 ml-1">Password</label>
           <div className="relative">
-            <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-sage-medium opacity-50" size={20} />
+            <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-sage-medium opacity-40" size={20} />
             <input 
               type="password" 
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
-              className="w-full bg-white border border-sage-pale rounded-xl py-4 pl-12 pr-4 text-sm focus:ring-2 focus:ring-sage-medium outline-none transition-all"
+              className="w-full bg-white border border-sage-pale/60 rounded-2xl py-4 pl-12 pr-4 text-sm font-bold focus:ring-4 focus:ring-sage-medium/10 outline-none transition-all"
             />
           </div>
         </div>
 
         <button 
           onClick={onLogin}
-          className="w-full bg-sage-medium text-white rounded-xl py-4 font-bold flex items-center justify-center gap-2 shadow-lg shadow-sage-medium/20 active:scale-[0.98] transition-all mt-4"
+          className="w-full bg-sage-medium text-white rounded-2xl py-5 font-bold text-lg flex items-center justify-center gap-2 shadow-xl shadow-sage-medium/20 active:scale-[0.98] transition-all mt-6"
         >
           Sign In
           <ArrowRight size={20} />

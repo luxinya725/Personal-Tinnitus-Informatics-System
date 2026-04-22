@@ -7,22 +7,23 @@ import { format } from 'date-fns';
 interface LogMedicationProps {
   onSave: (log: MedicationLog) => void;
   onBack: () => void;
+  initialData?: MedicationLog | null;
 }
 
-export default function LogMedicationPage({ onSave, onBack }: LogMedicationProps) {
-  const [datetime, setDatetime] = useState(format(new Date(), "yyyy-MM-dd'T'HH:mm"));
-  const [medicationName, setMedicationName] = useState('');
-  const [dosage, setDosage] = useState('');
-  const [frequency, setFrequency] = useState('Once daily');
-  const [reason, setReason] = useState('Tinnitus relief');
-  const [perceivedEffect, setPerceivedEffect] = useState<MedicationLog['perceivedEffect']>('Not sure');
-  const [notes, setNotes] = useState('');
+export default function LogMedicationPage({ onSave, onBack, initialData }: LogMedicationProps) {
+  const [datetime, setDatetime] = useState(initialData?.datetime ?? format(new Date(), "yyyy-MM-dd'T'HH:mm"));
+  const [medicationName, setMedicationName] = useState(initialData?.medicationName ?? '');
+  const [dosage, setDosage] = useState(initialData?.dosage ?? '');
+  const [frequency, setFrequency] = useState(initialData?.frequency ?? 'Once daily');
+  const [reason, setReason] = useState(initialData?.reason ?? 'Tinnitus relief');
+  const [perceivedEffect, setPerceivedEffect] = useState<MedicationLog['perceivedEffect']>(initialData?.perceivedEffect ?? 'Not sure');
+  const [notes, setNotes] = useState(initialData?.notes ?? '');
 
   const handleSave = () => {
     if (!medicationName) return;
     
     const log: MedicationLog = {
-      id: Date.now().toString(),
+      id: initialData?.id ?? Date.now().toString(),
       datetime,
       medicationName,
       dosage,
@@ -41,19 +42,10 @@ export default function LogMedicationPage({ onSave, onBack }: LogMedicationProps
           <ChevronLeft size={24} />
         </button>
         <h1 className="text-lg font-bold text-sage-dark">Log Medication</h1>
-        <button 
-          onClick={handleSave} 
-          disabled={!medicationName}
-          className={cn(
-            "font-bold text-sm px-4 py-2 rounded-xl transition-colors",
-            medicationName ? "text-white bg-sage-medium" : "text-sage-medium/50 bg-sage-pale cursor-not-allowed"
-          )}
-        >
-          Save
-        </button>
+        <div className="w-10" /> {/* Spacer to keep title centered */}
       </header>
 
-      <div className="flex-1 overflow-y-auto px-6 py-8 space-y-8 pb-24">
+      <div className="flex-1 px-6 py-8 space-y-8 pb-24">
         <div className="bg-sage-pale p-6 rounded-[18px] flex items-center gap-4 border border-sage-pale">
           <div className="bg-white p-3 rounded-xl shadow-sm">
             <Pill className="text-sage-medium" size={24} />

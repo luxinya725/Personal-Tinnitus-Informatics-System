@@ -5,15 +5,46 @@ import { TinnitusLog, MedicationLog } from '../types';
 import { cn } from '../lib/utils';
 import { format, isSameDay, parseISO } from 'date-fns';
 
+const getIntensityLabel = (severity: number) => {
+  if (severity === 0) return 'None';
+  if (severity <= 2) return 'Mild';
+  if (severity <= 5) return 'Moderate';
+  if (severity <= 8) return 'Severe';
+  return 'Unbearable';
+};
+
 interface HistoryProps {
   tinnitusLogs: TinnitusLog[];
   medicationLogs: MedicationLog[];
   onDeleteTinnitus: (id: string) => void;
   onDeleteMedication: (id: string) => void;
+  onEditTinnitus?: (log: TinnitusLog) => void;
+  onEditMedication?: (log: MedicationLog) => void;
+  isActive?: boolean;
 }
 
-export default function HistoryPage({ tinnitusLogs, medicationLogs, onDeleteTinnitus, onDeleteMedication }: HistoryProps) {
+export default function HistoryPage({ 
+  tinnitusLogs, 
+  medicationLogs, 
+  onDeleteTinnitus, 
+  onDeleteMedication,
+  onEditTinnitus,
+  onEditMedication,
+  isActive 
+}: HistoryProps) {
   const [activeTab, setActiveTab] = useState<'all' | 'tinnitus' | 'medication'>('all');
+
+  React.useEffect(() => {
+    if (isActive) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'auto';
+    }
+    
+    return () => {
+      document.body.style.overflow = 'auto';
+    };
+  }, [isActive]);
 
   const allLogs = [
     ...tinnitusLogs.map(log => ({ ...log, type: 'tinnitus' as const })),
@@ -34,30 +65,30 @@ export default function HistoryPage({ tinnitusLogs, medicationLogs, onDeleteTinn
   });
 
   return (
-    <div className="px-6 pt-16 pb-6 space-y-6">
-      <header className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold text-sage-dark">History</h1>
-        <button className="p-2 bg-white rounded-xl shadow-sm border border-sage-pale text-sage-medium">
-          <Filter size={20} />
+    <div className="history-screen px-6 pt-16">
+      <header className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-black text-sage-dark tracking-tight">History</h1>
+        <button className="p-2.5 bg-white rounded-2xl shadow-sm border border-sage-pale/50 text-sage-medium">
+          <Filter size={18} />
         </button>
       </header>
 
-      <div className="flex p-1 bg-sage-pale rounded-xl">
+      <div className="flex p-1.5 bg-sage-pale/50 rounded-2xl border border-sage-pale/30 mb-6 shrink-0">
         {(['all', 'tinnitus', 'medication'] as const).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
             className={cn(
-              "flex-1 py-2 text-[10px] font-bold uppercase tracking-widest rounded-lg transition-all",
-              activeTab === tab ? "bg-sage-medium text-white shadow-sm" : "text-sage-dark opacity-50"
+              "flex-1 py-2 text-[10px] font-extrabold rounded-xl transition-all",
+              activeTab === tab ? "bg-sage-medium text-white shadow-md shadow-sage-medium/20 scale-105" : "text-sage-dark opacity-40 hover:opacity-100"
             )}
           >
-            {tab}
+            {tab.charAt(0).toUpperCase() + tab.slice(1)}
           </button>
         ))}
       </div>
 
-      <div className="space-y-8">
+      <div className="history-content space-y-8">
         {Object.keys(groupedLogs).length === 0 ? (
           <div className="py-20 text-center space-y-4">
             <div className="w-16 h-16 bg-sage-50 rounded-full flex items-center justify-center mx-auto">
@@ -78,6 +109,13 @@ export default function HistoryPage({ tinnitusLogs, medicationLogs, onDeleteTinn
                       key={log.id} 
                       log={log} 
                       onDelete={() => log.type === 'tinnitus' ? onDeleteTinnitus(log.id) : onDeleteMedication(log.id)}
+                      onEdit={() => {
+                        if (log.type === 'tinnitus') {
+                          onEditTinnitus?.(log as any);
+                        } else {
+                          onEditMedication?.(log as any);
+                        }
+                      }}
                     />
                   ))}
                 </AnimatePresence>
@@ -90,7 +128,7 @@ export default function HistoryPage({ tinnitusLogs, medicationLogs, onDeleteTinn
   );
 }
 
-function LogItem({ log, onDelete }: { log: any, onDelete: () => void, key?: string }) {
+function LogItem({ log, onDelete, onEdit }: { log: any, onDelete: () => void, onEdit: () => void, key?: string }) {
   const [isExpanded, setIsExpanded] = useState(false);
 
   return (
@@ -99,36 +137,36 @@ function LogItem({ log, onDelete }: { log: any, onDelete: () => void, key?: stri
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.95 }}
-      className="bg-white rounded-[18px] border border-sage-pale card-shadow overflow-hidden"
+      className="bg-white rounded-[28px] border border-sage-pale/50 card-shadow overflow-hidden relative"
     >
       <div 
         onClick={() => setIsExpanded(!isExpanded)}
-        className="p-4 flex items-center gap-4 cursor-pointer active:bg-sage-pale/30 transition-colors"
+        className="p-5 flex items-center gap-4 cursor-pointer active:bg-sage-pale/20 transition-colors z-10"
       >
         <div className={cn(
-          "w-12 h-12 rounded-xl flex items-center justify-center shrink-0",
-          log.type === 'tinnitus' ? "bg-sage-pale text-sage-dark" : "bg-blue-50 text-blue-600"
+          "w-12 h-12 rounded-2xl flex items-center justify-center shrink-0",
+          log.type === 'tinnitus' ? "bg-sage-pale/70 text-sage-dark" : "bg-blue-50/70 text-blue-600"
         )}>
           {log.type === 'tinnitus' ? <Activity size={24} /> : <Pill size={24} />}
         </div>
         
         <div className="flex-1 min-w-0">
           <div className="flex justify-between items-start">
-            <h4 className="font-bold text-ink truncate">
-              {log.type === 'tinnitus' ? `Severity: ${log.severity}` : log.medicationName}
+            <h4 className="font-bold text-ink truncate tracking-tight">
+              {log.type === 'tinnitus' ? `Level ${log.severity}` : log.medicationName}
             </h4>
-            <span className="text-[10px] font-bold text-sage-medium opacity-60 whitespace-nowrap">
+            <span className="text-[10px] font-extrabold text-sage-medium/50 whitespace-nowrap">
               {format(parseISO(log.datetime), 'h:mm a')}
             </span>
           </div>
-          <p className="text-xs text-sage-medium opacity-80 truncate">
-            {log.type === 'tinnitus' ? `${log.duration} • ${log.stressLevel} stress` : `${log.dosage} • ${log.perceivedEffect}`}
+          <p className="text-xs text-sage-medium font-bold opacity-60 truncate">
+            {log.type === 'tinnitus' ? `${log.duration} • ${getIntensityLabel(log.severity)} intensity` : `${log.dosage} • ${log.perceivedEffect}`}
           </p>
         </div>
         
         <ChevronRight 
           size={18} 
-          className={cn("text-sage-pale transition-transform", isExpanded && "rotate-90")} 
+          className={cn("text-sage-pale/60 transition-transform", isExpanded && "rotate-90")} 
         />
       </div>
 
@@ -143,10 +181,33 @@ function LogItem({ log, onDelete }: { log: any, onDelete: () => void, key?: stri
             <div className="grid grid-cols-2 gap-4">
               {log.type === 'tinnitus' ? (
                 <>
-                  <Detail label="Mood" value={log.mood} />
+                  <Detail label="Mood" value={`${log.mood} (${log.moodLevel || '?'}/10)`} />
+                  <Detail label="Energy" value={`${log.energyLevel || '?'}/5`} />
+                  <Detail label="Sleep" value={`${log.sleepDuration || '?' }h (${log.sleepQualityValue || '?'}/5)`} />
                   <Detail label="Activity" value={log.activity} />
-                  <Detail label="Sleep" value={log.sleepQuality} />
-                  <Detail label="Caffeine" value={log.caffeine ? 'Yes' : 'No'} />
+                  
+                  {log.lifestyle && (
+                    <div className="col-span-2 space-y-1">
+                      <p className="text-[10px] font-bold text-sage-medium uppercase tracking-widest opacity-60">Lifestyle (0-3)</p>
+                      <div className="flex flex-wrap gap-x-3 gap-y-1">
+                        <span className="text-[10px] font-bold text-ink">Scroll: {log.lifestyle.doomscrolling}</span>
+                        <span className="text-[10px] font-bold text-ink">Caf: {log.lifestyle.caffeine}</span>
+                        <span className="text-[10px] font-bold text-ink">Alc: {log.lifestyle.alcohol}</span>
+                        <span className="text-[10px] font-bold text-ink">Games: {log.lifestyle.videoGames}</span>
+                        <span className="text-[10px] font-bold text-ink">Out: {log.lifestyle.timeOutside}</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {log.symptoms && (
+                    <div className="col-span-2 space-y-1 pt-1">
+                      <p className="text-[10px] font-bold text-sage-medium uppercase tracking-widest opacity-60">Secondary Symptoms (0-4)</p>
+                      <div className="flex flex-wrap gap-x-4">
+                        <span className="text-[10px] font-bold text-ink">Pulsating: {log.symptoms.pulsatingTinnitus}</span>
+                        <span className="text-[10px] font-bold text-ink">Headache: {log.symptoms.headache}</span>
+                      </div>
+                    </div>
+                  )}
                 </>
               ) : (
                 <>
@@ -164,7 +225,13 @@ function LogItem({ log, onDelete }: { log: any, onDelete: () => void, key?: stri
             )}
 
             <div className="flex gap-2 pt-2">
-              <button className="flex-1 bg-sage-pale text-sage-dark py-3 rounded-xl text-[10px] font-bold uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-sage-light/50">
+              <button 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onEdit();
+                }}
+                className="flex-1 bg-sage-pale text-sage-dark py-3 rounded-xl text-[10px] font-bold uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-sage-light/50"
+              >
                 <Edit3 size={14} /> Edit
               </button>
               <button 

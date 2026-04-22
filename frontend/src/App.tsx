@@ -21,6 +21,8 @@ export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [tinnitusLogs, setTinnitusLogs] = useState<TinnitusLog[]>([]);
   const [medicationLogs, setMedicationLogs] = useState<MedicationLog[]>([]);
+  const [editingTinnitusLog, setEditingTinnitusLog] = useState<TinnitusLog | null>(null);
+  const [editingMedicationLog, setEditingMedicationLog] = useState<MedicationLog | null>(null);
 
   useEffect(() => {
     const loggedIn = storage.isLoggedIn();
@@ -54,88 +56,144 @@ export default function App() {
   };
 
   const addTinnitusLog = (log: TinnitusLog) => {
-    storage.addTinnitusLog(log);
+    const isEdit = tinnitusLogs.some(l => l.id === log.id);
+    if (isEdit) {
+      storage.updateTinnitusLog(log);
+    } else {
+      storage.addTinnitusLog(log);
+    }
     setTinnitusLogs(storage.getTinnitusLogs());
+    setEditingTinnitusLog(null);
     navigate('success');
   };
 
   const addMedicationLog = (log: MedicationLog) => {
-    storage.addMedicationLog(log);
-    setMedicationLogs(storage.getMedicationLogs());
-    navigate('success');
-  };
-
-  const renderPage = () => {
-    switch (currentPage) {
-      case 'login':
-        return <LoginPage onLogin={handleLogin} />;
-      case 'home':
-        return (
-          <HomePage 
-            user={user} 
-            tinnitusLogs={tinnitusLogs} 
-            medicationLogs={medicationLogs} 
-            onNavigate={navigate} 
-          />
-        );
-      case 'dashboard':
-        return (
-          <DashboardPage 
-            tinnitusLogs={tinnitusLogs} 
-            medicationLogs={medicationLogs} 
-          />
-        );
-      case 'history':
-        return (
-          <HistoryPage 
-            tinnitusLogs={tinnitusLogs} 
-            medicationLogs={medicationLogs} 
-            onDeleteTinnitus={(id) => {
-              const newLogs = tinnitusLogs.filter(l => l.id !== id);
-              storage.saveTinnitusLogs(newLogs);
-              setTinnitusLogs(newLogs);
-            }}
-            onDeleteMedication={(id) => {
-              const newLogs = medicationLogs.filter(l => l.id !== id);
-              storage.saveMedicationLogs(newLogs);
-              setMedicationLogs(newLogs);
-            }}
-          />
-        );
-      case 'profile':
-        return <ProfilePage user={user} onLogout={handleLogout} />;
-      case 'log-tinnitus':
-        return <LogTinnitusPage onSave={addTinnitusLog} onBack={() => navigate('home')} />;
-      case 'log-medication':
-        return <LogMedicationPage onSave={addMedicationLog} onBack={() => navigate('home')} />;
-      case 'success':
-        return <SuccessPage onNavigate={navigate} />;
-      default:
-        return <HomePage user={user} tinnitusLogs={tinnitusLogs} medicationLogs={medicationLogs} onNavigate={navigate} />;
+    const isEdit = medicationLogs.some(l => l.id === log.id);
+    if (isEdit) {
+      storage.updateMedicationLog(log);
+    } else {
+      storage.addMedicationLog(log);
     }
+    setMedicationLogs(storage.getMedicationLogs());
+    setEditingMedicationLog(null);
+    navigate('success');
   };
 
   const showTabs = isLoggedIn && !['login', 'log-tinnitus', 'log-medication', 'success'].includes(currentPage);
 
   return (
-    <div className="min-h-screen max-w-md mx-auto bg-cream shadow-xl relative flex flex-col overflow-x-hidden">
+    <div className="app-container">
       <main className="flex-1 pb-24">
         <AnimatePresence mode="wait">
-          <motion.div
-            key={currentPage}
-            initial={{ opacity: 0, x: 10 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -10 }}
-            transition={{ duration: 0.2 }}
-            className="w-full h-full"
-          >
-            {renderPage()}
-          </motion.div>
+          {!isLoggedIn && currentPage === 'login' && (
+            <motion.div
+              key="login"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+            >
+              <LoginPage onLogin={handleLogin} />
+            </motion.div>
+          )}
+
+          {currentPage === 'success' && (
+            <motion.div
+              key="success"
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              className="w-full h-full"
+            >
+              <SuccessPage onNavigate={navigate} />
+            </motion.div>
+          )}
+
+          {currentPage === 'log-tinnitus' && (
+            <motion.div
+              key="log-tinnitus"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 20 }}
+              className="w-full h-full"
+            >
+              <LogTinnitusPage 
+                onSave={addTinnitusLog} 
+                onBack={() => {
+                  setEditingTinnitusLog(null);
+                  navigate('home');
+                }} 
+                initialData={editingTinnitusLog}
+              />
+            </motion.div>
+          )}
+
+          {currentPage === 'log-medication' && (
+            <motion.div
+              key="log-medication"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 20 }}
+              className="w-full h-full"
+            >
+              <LogMedicationPage 
+                onSave={addMedicationLog} 
+                onBack={() => {
+                  setEditingMedicationLog(null);
+                  navigate('home');
+                }} 
+                initialData={editingMedicationLog}
+              />
+            </motion.div>
+          )}
         </AnimatePresence>
+
+        {isLoggedIn && (
+          <div className="w-full h-full">
+            <div style={{ display: currentPage === 'home' ? 'block' : 'none' }}>
+              <HomePage user={user} tinnitusLogs={tinnitusLogs} medicationLogs={medicationLogs} onNavigate={navigate} />
+            </div>
+            <div style={{ display: currentPage === 'dashboard' ? 'block' : 'none' }}>
+              <DashboardPage tinnitusLogs={tinnitusLogs} medicationLogs={medicationLogs} />
+            </div>
+            <div style={{ display: currentPage === 'history' ? 'block' : 'none' }}>
+              <HistoryPage 
+                tinnitusLogs={tinnitusLogs} 
+                medicationLogs={medicationLogs} 
+                isActive={currentPage === 'history'}
+                onEditTinnitus={(log) => {
+                  setEditingTinnitusLog(log);
+                  navigate('log-tinnitus');
+                }}
+                onEditMedication={(log) => {
+                  setEditingMedicationLog(log);
+                  navigate('log-medication');
+                }}
+                onDeleteTinnitus={(id) => {
+                  if (window.confirm('Are you sure you want to delete this entry?')) {
+                    const newLogs = tinnitusLogs.filter(l => l.id !== id);
+                    setTinnitusLogs(newLogs);
+                    storage.saveTinnitusLogs(newLogs);
+                  }
+                }}
+                onDeleteMedication={(id) => {
+                  if (window.confirm('Are you sure you want to delete this medication entry?')) {
+                    const newLogs = medicationLogs.filter(l => l.id !== id);
+                    setMedicationLogs(newLogs);
+                    storage.saveMedicationLogs(newLogs);
+                  }
+                }}
+              />
+            </div>
+            <div style={{ display: currentPage === 'profile' ? 'block' : 'none' }}>
+              <ProfilePage user={user} onLogout={handleLogout} />
+            </div>
+          </div>
+        )}
       </main>
 
       {showTabs && (
-        <nav className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white border-t border-gray-100 px-6 py-3 flex justify-between items-center safe-area-bottom z-50">
+        <nav className="fixed bottom-0 left-0 right-0 max-w-[480px] mx-auto bg-white border-t border-gray-100 px-6 py-3 flex justify-between items-center safe-area-bottom z-50">
           <TabButton 
             active={currentPage === 'home'} 
             onClick={() => navigate('home')} 
