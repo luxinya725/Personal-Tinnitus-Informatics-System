@@ -1,42 +1,36 @@
 import pandas as pd
-from src.transformations import *
-# Parse column names, parse dates
+
+from src.transformations import build_daily_records
+
 
 class Pipeline:
-
-
-    def __init__(
-            self,
-            data_path: str,
-            ):
-        
+    def __init__(self, data_path: str, output_path: str = "output"):
         self.data_path = data_path
+        self.output_path = output_path
+        self.df: pd.DataFrame | None = None
+        self.result: pd.DataFrame | None = None
 
-        self.df = None
-
-    def extract(self):
+    def extract(self) -> None:
+        print(f"\tReading {self.data_path}")
         self.df = pd.read_csv(self.data_path)
+        print(f"\t{len(self.df)} rows loaded")
 
-    def transform(self):
-        self.df['date formatted'] = pd.to_datetime(self.df['date formatted'])
+    def transform(self) -> None:
+        self.result = build_daily_records(self.df)
+        print(f"\t{len(self.result)} daily records, {len(self.result.columns)} columns")
 
-    def load(self):
-        pass
+    def load(self) -> None:
+        csv_path = f"{self.output_path}.csv"
 
-    
+        self.result.to_csv(csv_path, index=False)
+        print(f"\tSaved CSV → {csv_path}")
 
-    def run(self):
-        print("Running processing pipeline")
-
+    def run(self) -> None:
+        print("Running pipeline")
         print("Extracting")
         self.extract()
-        
         print("Transforming")
         self.transform()
-
-        print("Loading to target path")
-        self.load()    
-
-        print(self.df['date formatted'])
-        
-        print("Finished pipeline")
+        print("Loading")
+        self.load()
+        print("Done")
