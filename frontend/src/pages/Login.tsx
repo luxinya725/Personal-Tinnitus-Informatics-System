@@ -13,7 +13,7 @@ export default function LoginPage({ onLogin }: { onLogin: () => void }) {
           <Activity className="text-white" size={40} />
         </div>
         <h1 className="text-3xl font-black text-sage-dark mb-2 tracking-tight">QuietSpace</h1>
-        <p className="text-sage-medium font-bold opacity-60">Your journey to silence starts here.</p>
+        <p className="text-sage-medium font-bold opacity-60">Your journey to silence starts here</p>
       </div>
 
       <div className="space-y-6 flex-1">
