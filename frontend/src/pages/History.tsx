@@ -13,6 +13,36 @@ const getIntensityLabel = (severity: number) => {
   return 'Unbearable';
 };
 
+// Normalise stress to a readable string regardless of schema
+const formatStress = (log: TinnitusLog): string => {
+  const s = (log as any).lifestyle?.stress;
+  if (s != null) {
+    if (s === 0) return 'None';
+    if (s === 1) return 'Low';
+    if (s === 2) return 'Medium';
+    return 'High';
+  }
+  return log.stressLevel ?? 'N/A';
+};
+
+// Normalise sleep quality to a readable string
+const formatSleep = (log: TinnitusLog): string => {
+  const v = (log as any).sleepQualityValue;
+  if (v != null) return `${v}/5`;
+  return log.sleepQuality ?? 'N/A';
+};
+
+// Boolean lifestyle fields → readable
+const formatBool = (val: boolean | undefined | null): string =>
+  val == null ? 'N/A' : val ? 'Yes' : 'No';
+
+// Pulsating tinnitus from either schema
+const formatPulsating = (log: TinnitusLog): string | null => {
+  const p = (log as any).symptoms?.pulsatingTinnitus;
+  if (p != null) return String(p);
+  return null;
+};
+
 interface HistoryProps {
   tinnitusLogs: TinnitusLog[];
   medicationLogs: MedicationLog[];
@@ -40,10 +70,7 @@ export default function HistoryPage({
     } else {
       document.body.style.overflow = 'auto';
     }
-    
-    return () => {
-      document.body.style.overflow = 'auto';
-    };
+    return () => { document.body.style.overflow = 'auto'; };
   }, [isActive]);
 
   const allLogs = [
@@ -56,7 +83,6 @@ export default function HistoryPage({
     return log.type === activeTab;
   });
 
-  // Group by day
   const groupedLogs: { [key: string]: typeof allLogs } = {};
   filteredLogs.forEach(log => {
     const day = format(parseISO(log.datetime), 'yyyy-MM-dd');
@@ -80,7 +106,9 @@ export default function HistoryPage({
             onClick={() => setActiveTab(tab)}
             className={cn(
               "flex-1 py-2 text-[10px] font-extrabold rounded-xl transition-all",
-              activeTab === tab ? "bg-sage-medium text-white shadow-md shadow-sage-medium/20 scale-105" : "text-sage-dark opacity-40 hover:opacity-100"
+              activeTab === tab
+                ? "bg-sage-medium text-white shadow-md shadow-sage-medium/20 scale-105"
+                : "text-sage-dark opacity-40 hover:opacity-100"
             )}
           >
             {tab.charAt(0).toUpperCase() + tab.slice(1)}
@@ -105,16 +133,13 @@ export default function HistoryPage({
               <div className="space-y-3">
                 <AnimatePresence initial={false}>
                   {logs.map((log) => (
-                    <LogItem 
-                      key={log.id} 
-                      log={log} 
+                    <LogItem
+                      key={log.id}
+                      log={log}
                       onDelete={() => log.type === 'tinnitus' ? onDeleteTinnitus(log.id) : onDeleteMedication(log.id)}
                       onEdit={() => {
-                        if (log.type === 'tinnitus') {
-                          onEditTinnitus?.(log as any);
-                        } else {
-                          onEditMedication?.(log as any);
-                        }
+                        if (log.type === 'tinnitus') onEditTinnitus?.(log as any);
+                        else onEditMedication?.(log as any);
                       }}
                     />
                   ))}
@@ -128,8 +153,10 @@ export default function HistoryPage({
   );
 }
 
-function LogItem({ log, onDelete, onEdit }: { log: any, onDelete: () => void, onEdit: () => void, key?: string }) {
+function LogItem({ log, onDelete, onEdit }: { log: any; onDelete: () => void; onEdit: () => void }) {
   const [isExpanded, setIsExpanded] = useState(false);
+
+  const pulsating = log.type === 'tinnitus' ? formatPulsating(log as TinnitusLog) : null;
 
   return (
     <motion.div
@@ -139,7 +166,7 @@ function LogItem({ log, onDelete, onEdit }: { log: any, onDelete: () => void, on
       exit={{ opacity: 0, scale: 0.95 }}
       className="bg-white rounded-[28px] border border-sage-pale/50 card-shadow overflow-hidden relative"
     >
-      <div 
+      <div
         onClick={() => setIsExpanded(!isExpanded)}
         className="p-5 flex items-center gap-4 cursor-pointer active:bg-sage-pale/20 transition-colors z-10"
       >
@@ -149,7 +176,7 @@ function LogItem({ log, onDelete, onEdit }: { log: any, onDelete: () => void, on
         )}>
           {log.type === 'tinnitus' ? <Activity size={24} /> : <Pill size={24} />}
         </div>
-        
+
         <div className="flex-1 min-w-0">
           <div className="flex justify-between items-start">
             <h4 className="font-bold text-ink truncate tracking-tight">
@@ -160,13 +187,15 @@ function LogItem({ log, onDelete, onEdit }: { log: any, onDelete: () => void, on
             </span>
           </div>
           <p className="text-xs text-sage-medium font-bold opacity-60 truncate">
-            {log.type === 'tinnitus' ? `${log.duration} • ${getIntensityLabel(log.severity)} intensity` : `${log.dosage} • ${log.perceivedEffect}`}
+            {log.type === 'tinnitus'
+              ? `${getIntensityLabel(log.severity)} intensity • ${log.mood}`
+              : `${log.dosage} • ${log.reason}`}
           </p>
         </div>
-        
-        <ChevronRight 
-          size={18} 
-          className={cn("text-sage-pale/60 transition-transform", isExpanded && "rotate-90")} 
+
+        <ChevronRight
+          size={18}
+          className={cn("text-sage-pale/60 transition-transform", isExpanded && "rotate-90")}
         />
       </div>
 
@@ -181,64 +210,44 @@ function LogItem({ log, onDelete, onEdit }: { log: any, onDelete: () => void, on
             <div className="grid grid-cols-2 gap-4">
               {log.type === 'tinnitus' ? (
                 <>
-                  <Detail label="Mood" value={`${log.mood} (${log.moodLevel || '?'}/10)`} />
-                  <Detail label="Energy" value={`${log.energyLevel || '?'}/5`} />
-                  <Detail label="Sleep" value={`${log.sleepDuration || '?' }h (${log.sleepQualityValue || '?'}/5)`} />
-                  <Detail label="Activity" value={log.activity} />
-                  
-                  {log.lifestyle && (
-                    <div className="col-span-2 space-y-1">
-                      <p className="text-[10px] font-bold text-sage-medium uppercase tracking-widest opacity-60">Lifestyle (0-3)</p>
-                      <div className="flex flex-wrap gap-x-3 gap-y-1">
-                        <span className="text-[10px] font-bold text-ink">Scroll: {log.lifestyle.doomscrolling}</span>
-                        <span className="text-[10px] font-bold text-ink">Caf: {log.lifestyle.caffeine}</span>
-                        <span className="text-[10px] font-bold text-ink">Alc: {log.lifestyle.alcohol}</span>
-                        <span className="text-[10px] font-bold text-ink">Games: {log.lifestyle.videoGames}</span>
-                        <span className="text-[10px] font-bold text-ink">Out: {log.lifestyle.timeOutside}</span>
-                      </div>
-                    </div>
-                  )}
-
-                  {log.symptoms && (
-                    <div className="col-span-2 space-y-1 pt-1">
-                      <p className="text-[10px] font-bold text-sage-medium uppercase tracking-widest opacity-60">Secondary Symptoms (0-4)</p>
-                      <div className="flex flex-wrap gap-x-4">
-                        <span className="text-[10px] font-bold text-ink">Pulsating: {log.symptoms.pulsatingTinnitus}</span>
-                        <span className="text-[10px] font-bold text-ink">Headache: {log.symptoms.headache}</span>
-                      </div>
-                    </div>
+                  <Detail label="Mood" value={log.mood} />
+                  <Detail label="Stress" value={formatStress(log as TinnitusLog)} />
+                  <Detail label="Sleep Quality" value={formatSleep(log as TinnitusLog)} />
+                  <Detail label="Activity" value={log.activity ?? 'N/A'} />
+                  <Detail label="Caffeine" value={formatBool(log.caffeine)} />
+                  <Detail label="Alcohol" value={formatBool(log.alcohol)} />
+                  <Detail label="Smoking" value={formatBool(log.smoking)} />
+                  <Detail label="Noise Exposure" value={formatBool(log.noiseExposure)} />
+                  {pulsating && (
+                    <Detail label="Pulsating Tinnitus" value={`${pulsating}/4`} />
                   )}
                 </>
               ) : (
                 <>
+                  <Detail label="Dosage" value={log.dosage} />
                   <Detail label="Frequency" value={log.frequency} />
                   <Detail label="Reason" value={log.reason} />
+                  <Detail label="Effect" value={log.perceivedEffect} />
                 </>
               )}
             </div>
-            
-            {log.notes && (
+
+            {log.notes ? (
               <div className="bg-cream p-3 rounded-xl border border-sage-pale">
                 <p className="text-[10px] font-bold text-sage-medium uppercase tracking-widest mb-1">Notes</p>
                 <p className="text-xs text-ink/70 italic">"{log.notes}"</p>
               </div>
-            )}
+            ) : null}
 
             <div className="flex gap-2 pt-2">
-              <button 
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onEdit();
-                }}
+              <button
+                onClick={(e) => { e.stopPropagation(); onEdit(); }}
                 className="flex-1 bg-sage-pale text-sage-dark py-3 rounded-xl text-[10px] font-bold uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-sage-light/50"
               >
                 <Edit3 size={14} /> Edit
               </button>
-              <button 
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onDelete();
-                }}
+              <button
+                onClick={(e) => { e.stopPropagation(); onDelete(); }}
                 className="flex-1 bg-red-50 text-red-500 py-3 rounded-xl text-[10px] font-bold uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-red-100"
               >
                 <Trash2 size={14} /> Delete
@@ -251,7 +260,7 @@ function LogItem({ log, onDelete, onEdit }: { log: any, onDelete: () => void, on
   );
 }
 
-function Detail({ label, value }: { label: string, value: string }) {
+function Detail({ label, value }: { label: string; value: string }) {
   return (
     <div>
       <p className="text-[10px] font-bold text-sage-medium uppercase tracking-widest opacity-60">{label}</p>
