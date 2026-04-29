@@ -1,25 +1,65 @@
 import React, { useState, useMemo } from 'react';
 import { 
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
-  BarChart, Bar, Cell, Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
+  BarChart, Bar, Cell, LabelList, Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
   AreaChart, Area
 } from 'recharts';
 import { Filter, Calendar, Info, TrendingUp, AlertCircle, Zap, Pill } from 'lucide-react';
 import { TinnitusLog, MedicationLog } from '../types';
 import { cn } from '../lib/utils';
-import { format, subDays, isAfter, parseISO, startOfDay, eachDayOfInterval } from 'date-fns';
+import { format, subDays, isAfter, parseISO, startOfDay, eachDayOfInterval, getDay } from 'date-fns';
 
 interface DashboardProps {
   tinnitusLogs: TinnitusLog[];
   medicationLogs: MedicationLog[];
 }
 
+// Helpers to normalise the mixed-legacy / new-schema fields coming out of storage.ts
+const getStressLevel = (log: TinnitusLog): number => {
+  // New schema: log.lifestyle?.stress is a number 0–3
+  if ((log as any).lifestyle?.stress != null) return (log as any).lifestyle.stress;
+  // Legacy schema: stressLevel string
+  const s = log.stressLevel;
+  if (s === 'High') return 3;
+  if (s === 'Medium') return 2;
+  if (s === 'Low') return 1;
+  return 0;
+};
+
+const getSleepQualityLevel = (log: TinnitusLog): number => {
+  // New schema: log.sleepQualityValue is 1–5
+  if ((log as any).sleepQualityValue != null) return (log as any).sleepQualityValue as number;
+  // Legacy schema: 'Good' | 'OK' | 'Poor'
+  if (log.sleepQuality === 'Poor') return 1;
+  if (log.sleepQuality === 'OK') return 3;
+  if (log.sleepQuality === 'Good') return 5;
+  return 3;
+};
+
+const getDoomscrolling = (log: TinnitusLog): number => {
+  const d = (log as any).lifestyle?.doomscrolling;
+  if (d == null) return 0;
+  return d; // number 0–3 in new schema
+};
+
+const getCaffeine = (log: TinnitusLog): boolean => {
+  if ((log as any).lifestyle?.caffeine != null) return (log as any).lifestyle.caffeine > 0;
+  return log.caffeine ?? false;
+};
+
+const getAnxiety = (log: TinnitusLog): number => {
+  const a = (log as any).symptoms?.anxiety;
+  if (a != null) return a; // number 0–4
+  return 0;
+};
+
 export default function DashboardPage({ tinnitusLogs, medicationLogs }: DashboardProps) {
-  const [timeRange, setTimeRange] = useState<7 | 30 | 90>(7);
+  const [timeRange, setTimeRange] = useState<7 | 30 | 90>(30);
 
   const filteredTinnitus = useMemo(() => {
     const cutoff = subDays(new Date(), timeRange);
-    return tinnitusLogs.filter(log => isAfter(parseISO(log.datetime), cutoff))
+    return tinnitusLogs
+      .filter(log => isAfter(parseISO(log.datetime), cutoff))
       .sort((a, b) => new Date(a.datetime).getTime() - new Date(b.datetime).getTime());
   }, [tinnitusLogs, timeRange]);
 
@@ -28,105 +68,203 @@ export default function DashboardPage({ tinnitusLogs, medicationLogs }: Dashboar
     return medicationLogs.filter(log => isAfter(parseISO(log.datetime), cutoff));
   }, [medicationLogs, timeRange]);
 
-  // 1. Severity over time data
+  // 1. Severity over time
   const severityData = useMemo(() => {
     const days = eachDayOfInterval({
       start: subDays(new Date(), timeRange - 1),
-      end: new Date()
+      end: new Date(),
     });
 
     return days.map(day => {
-      const dayLogs = filteredTinnitus.filter(log => 
-        format(parseISO(log.datetime), 'yyyy-MM-dd') === format(day, 'yyyy-MM-dd')
+      const dayStr = format(day, 'yyyy-MM-dd');
+      const dayLogs = filteredTinnitus.filter(
+        log => format(parseISO(log.datetime), 'yyyy-MM-dd') === dayStr
       );
-      
-      const avgSeverity = dayLogs.length > 0 
-        ? dayLogs.reduce((acc, curr) => acc + curr.severity, 0) / dayLogs.length 
-        : 0;
+      const avgSeverity =
+        dayLogs.length > 0
+          ? dayLogs.reduce((acc, curr) => acc + curr.severity, 0) / dayLogs.length
+          : null; // null = no data, gap in chart
 
       return {
-        date: format(day, 'MMM d'),
-        severity: parseFloat(avgSeverity.toFixed(1)),
-        count: dayLogs.length
+        date: format(day, timeRange <= 7 ? 'EEE' : 'MMM d'),
+        severity: avgSeverity !== null ? parseFloat(avgSeverity.toFixed(1)) : null,
+        count: dayLogs.length,
       };
     });
   }, [filteredTinnitus, timeRange]);
 
-  // 2. Time of day pattern
-  const timeOfDayData = useMemo(() => {
-    const hours = {
-      Morning: { count: 0, severity: 0 }, // 6-12
-      Afternoon: { count: 0, severity: 0 }, // 12-18
-      Evening: { count: 0, severity: 0 }, // 18-24
-      Night: { count: 0, severity: 0 }, // 0-6
-    };
-
-    filteredTinnitus.forEach(log => {
-      const hour = new Date(log.datetime).getHours();
-      let period: keyof typeof hours = 'Morning';
-      if (hour >= 12 && hour < 18) period = 'Afternoon';
-      else if (hour >= 18 && hour < 24) period = 'Evening';
-      else if (hour >= 0 && hour < 6) period = 'Night';
-      
-      hours[period].count++;
-      hours[period].severity += log.severity;
-    });
-
-    return Object.entries(hours).map(([name, data]) => ({
-      name,
-      count: data.count,
-      avgSeverity: data.count > 0 ? parseFloat((data.severity / data.count).toFixed(1)) : 0
-    }));
-  }, [filteredTinnitus]);
-
-  // 3. Context Correlation (Radar)
-  const correlationData = useMemo(() => {
-    const factors = [
-      { name: 'Stress', value: 0, count: 0 },
-      { name: 'Poor Sleep', value: 0, count: 0 },
-      { name: 'Doomscroll', value: 0, count: 0 },
-      { name: 'Headache', value: 0, count: 0 },
-      { name: 'Outside', value: 0, count: 0 },
+  // 2. Weekly distribution - average severity per weekday (Mon–Sun)
+  const weeklyData = useMemo(() => {
+    // getDay returns 0=Sun … 6=Sat; remap to Mon=0 … Sun=6
+    const days = [
+      { name: 'Mon', iso: 1, totalSeverity: 0, count: 0 },
+      { name: 'Tue', iso: 2, totalSeverity: 0, count: 0 },
+      { name: 'Wed', iso: 3, totalSeverity: 0, count: 0 },
+      { name: 'Thu', iso: 4, totalSeverity: 0, count: 0 },
+      { name: 'Fri', iso: 5, totalSeverity: 0, count: 0 },
+      { name: 'Sat', iso: 6, totalSeverity: 0, count: 0 },
+      { name: 'Sun', iso: 0, totalSeverity: 0, count: 0 },
     ];
 
     filteredTinnitus.forEach(log => {
-      // Stress (New or Legacy)
-      const stressVal = (log.lifestyle?.stress ?? (log.stressLevel === 'High' ? 3 : 1));
-      if (stressVal >= 2) { factors[0].value += log.severity; factors[0].count++; }
-      
-      // Sleep (New or Legacy)
-      const sleepVal = (log.sleepQualityValue != null ? (6 - log.sleepQualityValue) : (log.sleepQuality === 'Poor' ? 3 : 1));
-      if (sleepVal >= 3) { factors[1].value += log.severity; factors[1].count++; }
-
-      // Doomscrolling
-      if (log.lifestyle?.doomscrolling && log.lifestyle.doomscrolling >= 2) { factors[2].value += log.severity; factors[2].count++; }
-
-      // Headache
-      if (log.symptoms?.headache && log.symptoms.headache >= 2) { factors[3].value += log.severity; factors[3].count++; }
-
-      // Time Outside (Positive factor - checking if low outside time correlates)
-      if (log.lifestyle?.timeOutside != null && log.lifestyle.timeOutside <= 1) { factors[4].value += log.severity; factors[4].count++; }
+      const dow = getDay(parseISO(log.datetime)); // 0=Sun … 6=Sat
+      const bucket = days.find(d => d.iso === dow);
+      if (bucket) {
+        bucket.totalSeverity += log.severity;
+        bucket.count++;
+      }
     });
 
-    return factors.map(f => ({
-      subject: f.name,
-      A: f.count > 0 ? parseFloat((f.value / f.count).toFixed(1)) : 0,
-      fullMark: 10,
-    }));
+    const maxAvg = Math.max(
+      ...days.map(d => (d.count > 0 ? d.totalSeverity / d.count : 0)),
+      1
+    );
+
+    return days.map(d => {
+      const avg = d.count > 0 ? parseFloat((d.totalSeverity / d.count).toFixed(1)) : 0;
+      return {
+        name: d.name,
+        avgSeverity: avg,
+        count: d.count,
+        // relative intensity 0–1 for colour interpolation
+        intensity: avg / maxAvg,
+      };
+    });
   }, [filteredTinnitus]);
+
+  // 3. Trigger analysis - based on fields actually present in the real data
+  const triggerData = useMemo(() => {
+    // For each trigger we collect: avg tinnitus severity when present vs when absent
+    type Bucket = { sum: number; count: number };
+
+    const make = (): { present: Bucket; absent: Bucket } => ({
+      present: { sum: 0, count: 0 },
+      absent: { sum: 0, count: 0 },
+    });
+
+    const stress = make();
+    const poorSleep = make();
+    const caffeine = make();
+    const doomscroll = make();
+    const anxiety = make();
+
+    filteredTinnitus.forEach(log => {
+      const sev = log.severity;
+
+      // Stress
+      const stressLvl = getStressLevel(log);
+      (stressLvl >= 2 ? stress.present : stress.absent).sum += sev;
+      (stressLvl >= 2 ? stress.present : stress.absent).count++;
+
+      // Poor sleep (≤ 2 on 1-5 scale)
+      const sleepLvl = getSleepQualityLevel(log);
+      (sleepLvl <= 2 ? poorSleep.present : poorSleep.absent).sum += sev;
+      (sleepLvl <= 2 ? poorSleep.present : poorSleep.absent).count++;
+
+      // Caffeine
+      const caf = getCaffeine(log);
+      (caf ? caffeine.present : caffeine.absent).sum += sev;
+      (caf ? caffeine.present : caffeine.absent).count++;
+
+      // Doomscrolling
+      const doom = getDoomscrolling(log);
+      (doom >= 2 ? doomscroll.present : doomscroll.absent).sum += sev;
+      (doom >= 2 ? doomscroll.present : doomscroll.absent).count++;
+
+      // Anxiety symptoms
+      const anx = getAnxiety(log);
+      (anx >= 2 ? anxiety.present : anxiety.absent).sum += sev;
+      (anx >= 2 ? anxiety.present : anxiety.absent).count++;
+    });
+
+    const avg = (b: Bucket) => (b.count > 0 ? parseFloat((b.sum / b.count).toFixed(1)) : 0);
+    const diff = (b: { present: Bucket; absent: Bucket }) =>
+      parseFloat((avg(b.present) - avg(b.absent)).toFixed(1));
+
+    return [
+      {
+        label: 'Stress',
+        withSeverity: avg(stress.present),
+        withoutSeverity: avg(stress.absent),
+        delta: diff(stress),
+        sampleSize: stress.present.count,
+      },
+      {
+        label: 'Poor Sleep',
+        withSeverity: avg(poorSleep.present),
+        withoutSeverity: avg(poorSleep.absent),
+        delta: diff(poorSleep),
+        sampleSize: poorSleep.present.count,
+      },
+      {
+        label: 'Caffeine',
+        withSeverity: avg(caffeine.present),
+        withoutSeverity: avg(caffeine.absent),
+        delta: diff(caffeine),
+        sampleSize: caffeine.present.count,
+      },
+      {
+        label: 'Doomscrolling',
+        withSeverity: avg(doomscroll.present),
+        withoutSeverity: avg(doomscroll.absent),
+        delta: diff(doomscroll),
+        sampleSize: doomscroll.present.count,
+      },
+      {
+        label: 'Anxiety',
+        withSeverity: avg(anxiety.present),
+        withoutSeverity: avg(anxiety.absent),
+        delta: diff(anxiety),
+        sampleSize: anxiety.present.count,
+      },
+    ].sort((a, b) => b.delta - a.delta); // highest impact first
+  }, [filteredTinnitus]);
+
+  // Derived stats for insight cards
+  const insights = useMemo(() => {
+    const stressTrigger = triggerData.find(t => t.label === 'Stress');
+    const worstDay = weeklyData.reduce((a, b) => (a.avgSeverity > b.avgSeverity ? a : b));
+    const bestDay = weeklyData.reduce((a, b) =>
+      (a.avgSeverity > 0 && a.avgSeverity < b.avgSeverity) || b.avgSeverity === 0 ? a : b
+    );
+    const medDays = new Set(
+      filteredMedication.map(m => format(parseISO(m.datetime), 'yyyy-MM-dd'))
+    );
+    const medEffect = (() => {
+      let medSum = 0, medCount = 0, noMedSum = 0, noMedCount = 0;
+      filteredTinnitus.forEach(log => {
+        const d = format(parseISO(log.datetime), 'yyyy-MM-dd');
+        if (medDays.has(d)) { medSum += log.severity; medCount++; }
+        else { noMedSum += log.severity; noMedCount++; }
+      });
+      return {
+        withMed: medCount > 0 ? (medSum / medCount).toFixed(1) : '-',
+        withoutMed: noMedCount > 0 ? (noMedSum / noMedCount).toFixed(1) : '-',
+      };
+    })();
+
+    const fullDayName: Record<string, string> = {
+      Mon: 'Monday', Tue: 'Tuesday', Wed: 'Wednesday', Thu: 'Thursday',
+      Fri: 'Friday', Sat: 'Saturday', Sun: 'Sunday',
+    };
+
+    return { stressTrigger, worstDay, bestDay, medEffect, fullDayName };
+  }, [triggerData, weeklyData, filteredMedication, filteredTinnitus]);
 
   return (
     <div className="px-6 pt-16 pb-12 space-y-8">
       <header className="flex justify-between items-center">
         <h1 className="text-2xl font-black text-sage-dark tracking-tight">Patterns</h1>
         <div className="flex bg-sage-pale/50 p-1.5 rounded-2xl border border-sage-pale/30">
-          {[7, 30, 90].map((range) => (
+          {[7, 30, 90].map(range => (
             <button
               key={range}
               onClick={() => setTimeRange(range as any)}
               className={cn(
-                "px-3 py-1.5 text-[10px] font-extrabold rounded-xl transition-all",
-                timeRange === range ? "bg-sage-medium text-white shadow-md shadow-sage-medium/20 scale-105" : "text-sage-dark opacity-40 hover:opacity-100"
+                'px-3 py-1.5 text-[10px] font-extrabold rounded-xl transition-all',
+                timeRange === range
+                  ? 'bg-sage-medium text-white shadow-md shadow-sage-medium/20 scale-105'
+                  : 'text-sage-dark opacity-40 hover:opacity-100'
               )}
             >
               {range}d
@@ -140,56 +278,64 @@ export default function DashboardPage({ tinnitusLogs, medicationLogs }: Dashboar
         <div className="flex justify-between items-start">
           <div>
             <h2 className="font-bold text-sage-dark tracking-tight">Severity Over Time</h2>
-            <p className="text-xs text-sage-medium font-bold opacity-50 tracking-tight">Average daily symptom level</p>
+            <p className="text-xs text-sage-medium font-bold opacity-50 tracking-tight">
+              Average daily symptom level
+            </p>
           </div>
           <div className="bg-sage-pale/50 p-2.5 rounded-2xl">
             <TrendingUp size={20} className="text-sage-medium" />
           </div>
         </div>
-        
+
         <div className="h-48 w-full">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={severityData}>
               <defs>
                 <linearGradient id="colorSev" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#8A9A5B" stopOpacity={0.3}/>
-                  <stop offset="95%" stopColor="#8A9A5B" stopOpacity={0}/>
+                  <stop offset="5%" stopColor="#8A9A5B" stopOpacity={0.3} />
+                  <stop offset="95%" stopColor="#8A9A5B" stopOpacity={0} />
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E1E8E1" />
-              <XAxis 
-                dataKey="date" 
-                axisLine={false} 
-                tickLine={false} 
+              <XAxis
+                dataKey="date"
+                axisLine={false}
+                tickLine={false}
                 tick={{ fontSize: 10, fill: '#8A9A5B' }}
                 dy={10}
+                interval={timeRange <= 7 ? 0 : timeRange <= 30 ? 4 : 9}
               />
-              <YAxis 
-                hide 
-                domain={[0, 10]} 
+              <YAxis hide domain={[0, 10]} />
+              <Tooltip
+                contentStyle={{
+                  borderRadius: '16px',
+                  border: '1px solid #E1E8E1',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
+                }}
+                formatter={(v: any) => [v ?? 'No data', 'Severity']}
               />
-              <Tooltip 
-                contentStyle={{ borderRadius: '16px', border: '1px solid #E1E8E1', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}
-              />
-              <Area 
-                type="monotone" 
-                dataKey="severity" 
-                stroke="#8A9A5B" 
+              <Area
+                type="monotone"
+                dataKey="severity"
+                stroke="#8A9A5B"
                 strokeWidth={3}
-                fillOpacity={1} 
-                fill="url(#colorSev)" 
+                fillOpacity={1}
+                fill="url(#colorSev)"
+                connectNulls={false}
               />
             </AreaChart>
           </ResponsiveContainer>
         </div>
       </section>
 
-      {/* Time of Day Pattern */}
+      {/* Weekly Distribution */}
       <section className="bg-white p-7 rounded-[32px] border border-sage-pale/50 card-shadow space-y-6">
         <div className="flex justify-between items-start">
           <div>
-            <h2 className="font-bold text-sage-dark tracking-tight">Time of Day</h2>
-            <p className="text-xs text-sage-medium font-bold opacity-50 tracking-tight">When symptoms typically surface</p>
+            <h2 className="font-bold text-sage-dark tracking-tight">Weekly Distribution</h2>
+            <p className="text-xs text-sage-medium font-bold opacity-50 tracking-tight">
+              Average tinnitus severity by day of week
+            </p>
           </div>
           <div className="bg-sage-pale/50 p-2.5 rounded-2xl">
             <Zap size={20} className="text-sage-medium" />
@@ -198,57 +344,129 @@ export default function DashboardPage({ tinnitusLogs, medicationLogs }: Dashboar
 
         <div className="h-48 w-full">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={timeOfDayData}>
+            <BarChart data={weeklyData} barCategoryGap="25%">
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E1E8E1" />
-              <XAxis 
-                dataKey="name" 
-                axisLine={false} 
-                tickLine={false} 
+              <XAxis
+                dataKey="name"
+                axisLine={false}
+                tickLine={false}
                 tick={{ fontSize: 10, fill: '#8A9A5B' }}
                 dy={10}
               />
-              <YAxis hide />
-              <Tooltip 
+              <YAxis hide domain={[0, 10]} />
+              <Tooltip
                 cursor={{ fill: '#FCFAF7' }}
-                contentStyle={{ borderRadius: '16px', border: '1px solid #E1E8E1', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}
+                contentStyle={{
+                  borderRadius: '16px',
+                  border: '1px solid #E1E8E1',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
+                }}
+                formatter={(v: any, _: any, props: any) => [
+                  `${v} / 10 (${props.payload.count} logs)`,
+                  'Avg Severity',
+                ]}
               />
-              <Bar dataKey="count" radius={[6, 6, 0, 0]}>
-                {timeOfDayData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={entry.avgSeverity > 5 ? '#8A9A5B' : '#C1CDC1'} />
-                ))}
+              <Bar dataKey="avgSeverity" radius={[8, 8, 0, 0]}>
+                {weeklyData.map((entry, index) => {
+                  const opacity = 0.25 + entry.intensity * 0.75;
+                  return (
+                    <Cell
+                      key={`cell-${index}`}
+                      fill={`rgba(138, 154, 91, ${opacity})`}
+                    />
+                  );
+                })}
+                <LabelList
+                  dataKey="avgSeverity"
+                  position="insideTop"
+                  style={{ fontSize: 10, fontWeight: 800, fill: 'white' }}
+                  formatter={(v: number) => (v > 0 ? v : '')}
+                />
               </Bar>
             </BarChart>
           </ResponsiveContainer>
         </div>
       </section>
 
-      {/* Context Correlation */}
-      <section className="bg-white p-7 rounded-[32px] border border-sage-pale/50 card-shadow space-y-6">
+      {/* Trigger Analysis */}
+      <section className="bg-white p-7 rounded-[32px] border border-sage-pale/50 card-shadow space-y-5">
         <div className="flex justify-between items-start">
           <div>
             <h2 className="font-bold text-sage-dark tracking-tight">Trigger Analysis</h2>
-            <p className="text-xs text-sage-medium font-bold opacity-50 tracking-tight">Average severity per context</p>
+            <p className="text-xs text-sage-medium font-bold opacity-50 tracking-tight">
+              Avg severity with vs. without each factor
+            </p>
           </div>
           <div className="bg-sage-pale/50 p-2.5 rounded-2xl">
             <AlertCircle size={20} className="text-sage-medium" />
           </div>
         </div>
 
-        <div className="h-64 w-full flex justify-center">
-          <ResponsiveContainer width="100%" height="100%">
-            <RadarChart cx="50%" cy="50%" outerRadius="80%" data={correlationData}>
-              <PolarGrid stroke="#E1E8E1" />
-              <PolarAngleAxis dataKey="subject" tick={{ fontSize: 10, fill: '#556B2F', fontWeight: 600 }} />
-              <PolarRadiusAxis angle={30} domain={[0, 10]} hide />
-              <Radar
-                name="Severity"
-                dataKey="A"
-                stroke="#8A9A5B"
-                fill="#8A9A5B"
-                fillOpacity={0.5}
-              />
-            </RadarChart>
-          </ResponsiveContainer>
+        <div className="space-y-3">
+          {triggerData.map(trigger => {
+            const maxSev = 10;
+            const withPct = (trigger.withSeverity / maxSev) * 100;
+            const withoutPct = (trigger.withoutSeverity / maxSev) * 100;
+            const isPositiveDelta = trigger.delta > 0;
+
+            return (
+              <div key={trigger.label} className="space-y-1.5">
+                <div className="flex justify-between items-center">
+                  <span className="text-xs font-extrabold text-sage-dark">{trigger.label}</span>
+                  <div className="flex items-center gap-2">
+                    {trigger.sampleSize > 0 && (
+                      <span className="text-[9px] text-sage-medium opacity-50">
+                        n={trigger.sampleSize}
+                      </span>
+                    )}
+                    <span
+                      className={cn(
+                        'text-[10px] font-extrabold px-2 py-0.5 rounded-full',
+                        trigger.delta > 0.5
+                          ? 'bg-red-50 text-red-500'
+                          : trigger.delta < -0.5
+                          ? 'bg-green-50 text-green-600'
+                          : 'bg-sage-pale/50 text-sage-medium'
+                      )}
+                    >
+                      {trigger.delta > 0 ? '+' : ''}{trigger.delta}
+                    </span>
+                  </div>
+                </div>
+
+                {/* With / Without bars */}
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[9px] text-sage-medium w-12 shrink-0 opacity-60">With</span>
+                    <div className="flex-1 bg-sage-pale/40 rounded-full h-2 overflow-hidden">
+                      <div
+                        className="h-full rounded-full transition-all duration-500"
+                        style={{
+                          width: `${withPct}%`,
+                          backgroundColor: isPositiveDelta ? '#ef4444' : '#8A9A5B',
+                        }}
+                      />
+                    </div>
+                    <span className="text-[9px] font-bold text-sage-dark w-6 text-right">
+                      {trigger.withSeverity}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[9px] text-sage-medium w-12 shrink-0 opacity-60">Without</span>
+                    <div className="flex-1 bg-sage-pale/40 rounded-full h-2 overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-sage-pale transition-all duration-500"
+                        style={{ width: `${withoutPct}%`, backgroundColor: '#C1CDC1' }}
+                      />
+                    </div>
+                    <span className="text-[9px] font-bold text-sage-dark w-6 text-right">
+                      {trigger.withoutSeverity}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </section>
 
@@ -256,20 +474,24 @@ export default function DashboardPage({ tinnitusLogs, medicationLogs }: Dashboar
       <section className="space-y-4">
         <h2 className="font-bold text-sage-900 ml-1">Key Insights</h2>
         <div className="space-y-3">
-          <InsightCard 
-            icon={<TrendingUp size={18} className="text-red-500" />}
-            title="Stress Impact"
-            description="Higher severity logs appear on high-stress days. Your average severity jumps from 3.2 to 6.8 during stress peaks."
-          />
-          <InsightCard 
-            icon={<Zap size={18} className="text-yellow-500" />}
-            title="Evening Sensitivity"
-            description="Symptoms are 40% more frequent in the evening. This correlates with quieter environments."
-          />
-          <InsightCard 
+          {insights.stressTrigger && insights.stressTrigger.delta > 0 && (
+            <InsightCard
+              icon={<TrendingUp size={18} className="text-red-500" />}
+              title="Stress Impact"
+              description={`On high-stress days your average severity is ${insights.stressTrigger.withSeverity}/10 vs ${insights.stressTrigger.withoutSeverity}/10 on calmer days - a difference of ${insights.stressTrigger.delta} points.`}
+            />
+          )}
+          {insights.worstDay.avgSeverity > 0 && (
+            <InsightCard
+              icon={<Zap size={18} className="text-yellow-500" />}
+              title={`${insights.fullDayName[insights.worstDay.name]}s Are Toughest`}
+              description={`${insights.fullDayName[insights.worstDay.name]}s average the highest severity (${insights.worstDay.avgSeverity}/10). ${insights.bestDay.avgSeverity > 0 ? `${insights.fullDayName[insights.bestDay.name]}s tend to be your best days at ${insights.bestDay.avgSeverity}/10.` : ''}`}
+            />
+          )}
+          <InsightCard
             icon={<Pill size={18} className="text-blue-500" />}
-            title="Medication Efficacy"
-            description="Medication logs often occur before lower severity entries. Average relief noted within 3 hours."
+            title="Medication Days"
+            description={`On days you took medication, average severity was ${insights.medEffect.withMed}/10 vs ${insights.medEffect.withoutMed}/10 on days without.`}
           />
         </div>
       </section>
@@ -277,12 +499,18 @@ export default function DashboardPage({ tinnitusLogs, medicationLogs }: Dashboar
   );
 }
 
-function InsightCard({ icon, title, description }: { icon: React.ReactNode, title: string, description: string }) {
+function InsightCard({
+  icon,
+  title,
+  description,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+}) {
   return (
     <div className="bg-insight-bg p-5 rounded-[18px] border-l-4 border-insight-border shadow-sm flex gap-4">
-      <div className="shrink-0 pt-1">
-        {icon}
-      </div>
+      <div className="shrink-0 pt-1">{icon}</div>
       <div className="space-y-1">
         <h4 className="font-bold text-insight-text text-sm">{title}</h4>
         <p className="text-xs text-insight-text/80 leading-relaxed">{description}</p>
@@ -290,4 +518,3 @@ function InsightCard({ icon, title, description }: { icon: React.ReactNode, titl
     </div>
   );
 }
-
