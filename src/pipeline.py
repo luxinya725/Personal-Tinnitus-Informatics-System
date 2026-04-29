@@ -21,9 +21,13 @@ class Pipeline:
 
     def load(self) -> None:
         csv_path = f"{self.output_path}.csv"
+        json_path = f"{self.output_path}.json"
 
         self.result.to_csv(csv_path, index=False)
         print(f"\tSaved CSV → {csv_path}")
+
+        self.result.to_json(json_path, orient="records", indent=2)
+        print(f"\tSaved JSON → {json_path}")
 
     def run(self) -> None:
         print("Running pipeline")
