@@ -11,4 +11,4 @@
 1. Build container
    `docker build -t quietspace .`
 2. Run container detached
-   `docker run -d -p 80:8080 quietspace`
+   `docker run -d -p 443:443 -p 80:80 quietspace`
