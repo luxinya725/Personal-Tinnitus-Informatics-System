@@ -16,7 +16,7 @@ interface DashboardProps {
 }
 
 // ------------------------------------------------------------------
-// Helpers — normalise legacy / new-schema / raw-data fields
+// Helpers - normalise legacy / new-schema / raw-data fields
 // ------------------------------------------------------------------
 
 const getStressLevel = (log: TinnitusLog): number => {
@@ -561,7 +561,7 @@ function InteractionHeatmap({ tinnitusLogs, xVar, yVar }: { tinnitusLogs: Tinnit
                       </span>
                     </>
                   ) : (
-                    <span className="text-[10px] text-gray-300">—</span>
+                    <span className="text-[10px] text-gray-300">-</span>
                   )}
                 </div>
               );
@@ -632,7 +632,7 @@ export default function DashboardPage({ tinnitusLogs, medicationLogs }: Dashboar
     return medicationLogs.filter(log => isAfter(parseISO(log.datetime), cutoff));
   }, [medicationLogs, timeRange, referenceDate]);
 
-  // 1. Severity over time — with overlay values, rolling avg & med markers
+  // 1. Severity over time - with overlay values, rolling avg & med markers
   const severityData = useMemo(() => {
     const days = eachDayOfInterval({
       start: subDays(referenceDate, timeRange - 1),
@@ -753,7 +753,7 @@ export default function DashboardPage({ tinnitusLogs, medicationLogs }: Dashboar
       .filter(p => p.count > 0);
   }, [filteredTinnitus]);
 
-  // 4. Symptom load — avg tinnitus by number of other symptoms logged
+  // 4. Symptom load - avg tinnitus by number of other symptoms logged
   const symptomLoadData = useMemo(() => {
     const symptomKeys = [
       'symptom_anxiety', 'symptom_intrusive_thoughts', 'symptom_muscle_tension',
@@ -791,7 +791,7 @@ export default function DashboardPage({ tinnitusLogs, medicationLogs }: Dashboar
     })).filter(d => d.count > 0);
   }, [filteredTinnitus]);
 
-  // 5. Day profile radar — high vs low tinnitus days
+  // 5. Day profile radar - high vs low tinnitus days
   const radarData = useMemo(() => {
     const tinnitusLogsWithData = filteredTinnitus.filter(l => l.severity > 0);
     if (tinnitusLogsWithData.length < 10) return [];
@@ -835,7 +835,7 @@ export default function DashboardPage({ tinnitusLogs, medicationLogs }: Dashboar
     });
   }, [filteredTinnitus]);
 
-  // 7. Spike predictor — what factors precede tinnitus spikes
+  // 7. Spike predictor - what factors precede tinnitus spikes
   const spikePredictorData = useMemo(() => {
     // Aggregate to daily max severity (only days with actual tinnitus data)
     const dailyMap: Record<string, { severity: number; log: TinnitusLog }> = {};
@@ -1037,10 +1037,10 @@ export default function DashboardPage({ tinnitusLogs, medicationLogs }: Dashboar
     if (timeRange === 'all') {
       const first = filteredTinnitus[0];
       const last = filteredTinnitus[filteredTinnitus.length - 1];
-      return `${format(parseISO(first.datetime), 'MMM d, yyyy')} — ${format(parseISO(last.datetime), 'MMM d, yyyy')}`;
+      return `${format(parseISO(first.datetime), 'MMM d, yyyy')} - ${format(parseISO(last.datetime), 'MMM d, yyyy')}`;
     }
     const start = subDays(referenceDate, timeRange);
-    return `${format(start, 'MMM d')} — ${format(referenceDate, 'MMM d')}`;
+    return `${format(start, 'MMM d')} - ${format(referenceDate, 'MMM d')}`;
   }, [timeRange, referenceDate, filteredTinnitus]);
 
   return (
@@ -1099,7 +1099,7 @@ export default function DashboardPage({ tinnitusLogs, medicationLogs }: Dashboar
         </p>
       </header>
 
-      {/* Severity Over Time — now with interactive overlays */}
+      {/* Severity Over Time - now with interactive overlays */}
       <section className="bg-white p-7 rounded-[32px] border border-sage-pale/50 card-shadow space-y-5">
         <div className="flex justify-between items-start">
           <div>
@@ -1470,7 +1470,7 @@ export default function DashboardPage({ tinnitusLogs, medicationLogs }: Dashboar
         <InteractionHeatmap tinnitusLogs={filteredTinnitus} xVar={xVar} yVar={yVar} />
       </section>
 
-      {/* Factor Connections — Symptoms & Lifestyle */}
+      {/* Factor Connections - Symptoms & Lifestyle */}
       <section className="bg-white p-7 rounded-[32px] border border-sage-pale/50 card-shadow space-y-5">
         <div className="flex justify-between items-start">
           <div>
@@ -1588,7 +1588,7 @@ export default function DashboardPage({ tinnitusLogs, medicationLogs }: Dashboar
             <InsightCard
               icon={<Heart size={18} className="text-red-400" />}
               title={`${insights.strongestLifestyle.label} Impact`}
-              description={`Days with ${insights.strongestLifestyle.label.toLowerCase()} average ${insights.strongestLifestyle.withSeverity}/10 vs ${insights.strongestLifestyle.withoutSeverity}/10 without — a ${insights.strongestLifestyle.delta > 0 ? 'rise' : 'drop'} of ${Math.abs(insights.strongestLifestyle.delta)} points.`}
+              description={`Days with ${insights.strongestLifestyle.label.toLowerCase()} average ${insights.strongestLifestyle.withSeverity}/10 vs ${insights.strongestLifestyle.withoutSeverity}/10 without - a ${insights.strongestLifestyle.delta > 0 ? 'rise' : 'drop'} of ${Math.abs(insights.strongestLifestyle.delta)} points.`}
             />
           )}
           {insights.worstPhase && insights.bestPhase && insights.worstPhase.name !== insights.bestPhase.name && (
