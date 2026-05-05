@@ -5,7 +5,7 @@ import {
   RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Legend,
   ScatterChart, Scatter
 } from 'recharts';
-import { Filter, Calendar, Info, TrendingUp, AlertCircle, Zap, Pill, Activity, Brain, Heart, Droplets, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Filter, Calendar, Info, TrendingUp, AlertCircle, Zap, Pill, Activity, Brain, Heart, Droplets, ChevronLeft, ChevronRight, BarChart3, Grid3X3, Target, Scale, Flame, Layers } from 'lucide-react';
 import { TinnitusLog, MedicationLog } from '../types';
 import { cn } from '../lib/utils';
 import { format, subDays, addDays, isAfter, parseISO, startOfDay, eachDayOfInterval, getDay, differenceInDays } from 'date-fns';
@@ -737,20 +737,18 @@ export default function DashboardPage({ tinnitusLogs, medicationLogs }: Dashboar
   // 3. Cycle phase analysis
   const cyclePhaseData = useMemo(() => {
     const phases = ['Period', 'Follicular', 'Ovulation', 'Luteal'];
-    return phases
-      .map(phase => {
-        const logs = filteredTinnitus.filter(log => {
-          const raw = (log as any).rawData;
-          return raw?.cycle_phase === phase;
-        });
-        const avg = logs.length > 0 ? logs.reduce((acc, l) => acc + l.severity, 0) / logs.length : 0;
-        return {
-          name: phase,
-          avgSeverity: parseFloat(avg.toFixed(1)),
-          count: logs.length,
-        };
-      })
-      .filter(p => p.count > 0);
+    return phases.map(phase => {
+      const logs = filteredTinnitus.filter(log => {
+        const raw = (log as any).rawData;
+        return raw?.cycle_phase === phase;
+      });
+      const avg = logs.length > 0 ? logs.reduce((acc, l) => acc + l.severity, 0) / logs.length : 0;
+      return {
+        name: phase,
+        avgSeverity: parseFloat(avg.toFixed(1)),
+        count: logs.length,
+      };
+    });
   }, [filteredTinnitus]);
 
   // 4. Symptom load - avg tinnitus by number of other symptoms logged
@@ -1109,7 +1107,7 @@ export default function DashboardPage({ tinnitusLogs, medicationLogs }: Dashboar
             </p>
           </div>
           <div className="bg-sage-pale/50 p-2.5 rounded-2xl">
-            <TrendingUp size={20} className="text-sage-medium" />
+            <Activity size={20} className="text-sage-medium" />
           </div>
         </div>
 
@@ -1229,7 +1227,7 @@ export default function DashboardPage({ tinnitusLogs, medicationLogs }: Dashboar
             </p>
           </div>
           <div className="bg-sage-pale/50 p-2.5 rounded-2xl">
-            <Zap size={20} className="text-sage-medium" />
+            <BarChart3 size={20} className="text-sage-medium" />
           </div>
         </div>
 
@@ -1296,7 +1294,13 @@ export default function DashboardPage({ tinnitusLogs, medicationLogs }: Dashboar
 
           <div className="h-44 w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={cyclePhaseData} barCategoryGap="25%">
+              <AreaChart data={cyclePhaseData}>
+                <defs>
+                  <linearGradient id="colorCycle" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#8A9A5B" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="#8A9A5B" stopOpacity={0.05} />
+                  </linearGradient>
+                </defs>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E1E8E1" />
                 <XAxis
                   dataKey="name"
@@ -1304,29 +1308,31 @@ export default function DashboardPage({ tinnitusLogs, medicationLogs }: Dashboar
                   tickLine={false}
                   tick={{ fontSize: 10, fill: '#8A9A5B' }}
                   dy={10}
+                  interval={0}
+                  padding={{ left: 20, right: 20 }}
                 />
                 <YAxis hide domain={[0, 10]} />
                 <Tooltip
-                  cursor={{ fill: '#FCFAF7' }}
                   contentStyle={{
                     borderRadius: '16px',
                     border: '1px solid #E1E8E1',
                     boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
                   }}
                   formatter={(v: any, _: any, props: any) => [
-                    `${v} / 10 (${props.payload.count} days)`,
+                    props.payload.count > 0 ? `${v} / 10 (${props.payload.count} days)` : 'No data',
                     'Avg Severity',
                   ]}
                 />
-                <Bar dataKey="avgSeverity" radius={[8, 8, 0, 0]} fill="rgba(138, 154, 91, 0.7)">
-                  <LabelList
-                    dataKey="avgSeverity"
-                    position="insideTop"
-                    style={{ fontSize: 10, fontWeight: 800, fill: 'white' }}
-                    formatter={(v: number) => (v > 0 ? v : '')}
-                  />
-                </Bar>
-              </BarChart>
+                <Area
+                  type="monotone"
+                  dataKey="avgSeverity"
+                  stroke="#8A9A5B"
+                  strokeWidth={2.5}
+                  fill="url(#colorCycle)"
+                  dot={{ r: 4, fill: '#8A9A5B', stroke: '#fff', strokeWidth: 2 }}
+                  activeDot={{ r: 6, fill: '#556B2F', stroke: '#fff', strokeWidth: 2 }}
+                />
+              </AreaChart>
             </ResponsiveContainer>
           </div>
         </section>
@@ -1343,7 +1349,7 @@ export default function DashboardPage({ tinnitusLogs, medicationLogs }: Dashboar
               </p>
             </div>
             <div className="bg-sage-pale/50 p-2.5 rounded-2xl">
-              <Activity size={20} className="text-sage-medium" />
+              <Layers size={20} className="text-sage-medium" />
             </div>
           </div>
 
@@ -1396,7 +1402,7 @@ export default function DashboardPage({ tinnitusLogs, medicationLogs }: Dashboar
               </p>
             </div>
             <div className="bg-sage-pale/50 p-2.5 rounded-2xl">
-              <Brain size={20} className="text-sage-medium" />
+              <Target size={20} className="text-sage-medium" />
             </div>
           </div>
 
@@ -1434,7 +1440,7 @@ export default function DashboardPage({ tinnitusLogs, medicationLogs }: Dashboar
             </p>
           </div>
           <div className="bg-sage-pale/50 p-2.5 rounded-2xl">
-            <Activity size={20} className="text-sage-medium" />
+            <Grid3X3 size={20} className="text-sage-medium" />
           </div>
         </div>
 
@@ -1480,7 +1486,7 @@ export default function DashboardPage({ tinnitusLogs, medicationLogs }: Dashboar
             </p>
           </div>
           <div className="bg-sage-pale/50 p-2.5 rounded-2xl">
-            <Activity size={20} className="text-sage-medium" />
+            <Scale size={20} className="text-sage-medium" />
           </div>
         </div>
 
@@ -1519,7 +1525,7 @@ export default function DashboardPage({ tinnitusLogs, medicationLogs }: Dashboar
               </p>
             </div>
             <div className="bg-sage-pale/50 p-2.5 rounded-2xl">
-              <TrendingUp size={20} className="text-sage-medium" />
+              <Flame size={20} className="text-sage-medium" />
             </div>
           </div>
 
