@@ -6,7 +6,10 @@ const STORAGE_KEYS = {
   MEDICATION_LOGS: 'medication_logs',
   USER: 'tinnitus_user',
   IS_LOGGED_IN: 'is_logged_in',
+  DATA_VERSION: 'tinnitus_data_version',
 };
+
+const CURRENT_DATA_VERSION = '2'; // bump when schema changes
 
 const DEFAULT_USER: User = {
   email: 'alex@example.com',
@@ -161,6 +164,7 @@ const importRealData = (): { tinnitusLogs: TinnitusLog[]; medicationLogs: Medica
       notes: entry.symptom_pulsating_tinnitus
         ? `Pulsating tinnitus severity: ${entry.symptom_pulsating_tinnitus}`
         : '',
+      rawData: entry as Record<string, unknown>,
     };
 
     tinnitusLogs.push(tinnitusLog);
@@ -193,10 +197,13 @@ const importRealData = (): { tinnitusLogs: TinnitusLog[]; medicationLogs: Medica
 
 export const storage = {
   getTinnitusLogs: (): TinnitusLog[] => {
+    const version = localStorage.getItem(STORAGE_KEYS.DATA_VERSION);
     const data = localStorage.getItem(STORAGE_KEYS.TINNITUS_LOGS);
-    if (!data) {
-      const { tinnitusLogs } = importRealData();
+    if (!data || version !== CURRENT_DATA_VERSION) {
+      const { tinnitusLogs, medicationLogs } = importRealData();
       storage.saveTinnitusLogs(tinnitusLogs);
+      storage.saveMedicationLogs(medicationLogs);
+      localStorage.setItem(STORAGE_KEYS.DATA_VERSION, CURRENT_DATA_VERSION);
       return tinnitusLogs;
     }
     return JSON.parse(data);
@@ -212,10 +219,13 @@ export const storage = {
   },
 
   getMedicationLogs: (): MedicationLog[] => {
+    const version = localStorage.getItem(STORAGE_KEYS.DATA_VERSION);
     const data = localStorage.getItem(STORAGE_KEYS.MEDICATION_LOGS);
-    if (!data) {
-      const { medicationLogs } = importRealData();
+    if (!data || version !== CURRENT_DATA_VERSION) {
+      const { tinnitusLogs, medicationLogs } = importRealData();
+      storage.saveTinnitusLogs(tinnitusLogs);
       storage.saveMedicationLogs(medicationLogs);
+      localStorage.setItem(STORAGE_KEYS.DATA_VERSION, CURRENT_DATA_VERSION);
       return medicationLogs;
     }
     return JSON.parse(data);

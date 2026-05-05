@@ -29,16 +29,16 @@ export interface TinnitusLog {
   duration: Duration;
   stressLevel: StressLevel;
   mood: Mood;
-  moodLevel: number; // 1-10
-  energyLevel: number; // 1-5
+  moodLevel?: number; // 1-10
+  energyLevel?: number; // 1-5
   
-  symptoms: Symptoms;
-  lifestyle: LifestyleFactors;
-  walking: LifestyleScale;
+  symptoms?: Symptoms;
+  lifestyle?: LifestyleFactors;
+  walking?: LifestyleScale;
   
-  sleepQualityValue: number; // 1-5
-  sleepDuration: number; // hours
-  menstrualCycle: string; // "Not in period", "In period", etc.
+  sleepQualityValue?: number; // 1-5
+  sleepDuration?: number; // hours
+  menstrualCycle?: string; // "Not in period", "In period", etc.
 
   caffeine: boolean; // Keeping for backward compatibility or direct check
   alcohol: boolean;
@@ -48,6 +48,9 @@ export interface TinnitusLog {
   activity: string;
   copingStrategies: string[];
   notes: string;
+  
+  /** Original imported data fields, preserved for richer dashboard analysis */
+  rawData?: Record<string, unknown>;
   
   // Medication section
   medicationTaken?: boolean;
@@ -65,7 +68,7 @@ export interface MedicationLog {
   dosage: string;
   frequency?: string;
   reason?: string;
-  perceivedEffect: 'Improved' | 'No change' | 'Worse' | 'Not sure';
+  perceivedEffect: 'Improved' | 'No change' | 'Worse' | 'Not sure' | 'Unknown';
   notes: string;
 }
 
