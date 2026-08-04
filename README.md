@@ -2,7 +2,7 @@
 React app made as functional prototype for course 02808 Personal Data Interaction (Spring 2026)
 
 # Frontend
-You can find the frontend in the frontend folder. See the README.md within the frontend folder to see how to deploy to production. It was built by Juno, Yuling and Xinya.
+You can find the frontend in the frontend folder. See the README.md within the frontend folder to see how to deploy to production. It was built by Juno, Xinya and Yuling.
 
 ## Live demo
 [Open QuietSpace on GitHub Pages](https://luxinya725.github.io/Personal-Tinnitus-Informatics-System/)
